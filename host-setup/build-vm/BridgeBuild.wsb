@@ -1,0 +1,38 @@
+<Configuration>
+  <!-- BlackBerry Bridge — safe build environment.
+       Windows Sandbox is a disposable, throwaway Windows instance (built into Win11 Pro).
+       Smart App Control does NOT run inside it, so the unsigned 2014 BlackBerry compiler
+       works here while your real Windows stays fully protected. Nothing installed here
+       touches the host — the only output is the built .bar, written to a shared folder.
+
+       To use:  1) enable Windows Sandbox once (see docs/SAFE-BUILD.md),
+                2) double-click this file. It builds BridgeLauncher.bar automatically.
+                3) back on the host, deploy it (deploy is NOT blocked by SAC). -->
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\bbndk</HostFolder>
+      <SandboxFolder>C:\bbndk</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+    <MappedFolder>
+      <HostFolder>C:\Users\user\AppData\Local\Research In Motion\BlackBerry Native SDK</HostFolder>
+      <SandboxFolder>C:\qnxconfig</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+    <MappedFolder>
+      <HostFolder>C:\Users\user\Desktop\coding\Blackberry revolution\cascades-app\BridgeLauncher</HostFolder>
+      <SandboxFolder>C:\BridgeLauncher</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+    <MappedFolder>
+      <HostFolder>C:\Users\user\Desktop\coding\Blackberry revolution\host-setup\build-vm</HostFolder>
+      <SandboxFolder>C:\build</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -NoExit -ExecutionPolicy Bypass -File C:\build\build-bar.ps1</Command>
+  </LogonCommand>
+  <MemoryInMB>4096</MemoryInMB>
+  <Networking>Disable</Networking>
+</Configuration>

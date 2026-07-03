@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<qnx xmlns="http://www.qnx.com/schemas/application/1.0">
+
+    <id>com.bridge.hellobridge</id>
+    <name>HelloBridge</name>
+    <versionNumber>1.0.0</versionNumber>
+    <buildId>1</buildId>
+    <description>BlackBerry Bridge pipe test</description>
+    <author>BlackBerry Bridge</author>
+
+    <initialWindow>
+        <autoOrients>false</autoOrients>
+        <aspectRatio>portrait</aspectRatio>
+        <systemChrome>none</systemChrome>
+    </initialWindow>
+
+    <!-- NOTE: native entry point (no <entryPointType>Qt</entryPointType>).
+         The Qt launcher on the 10.3.2 simulator rejects 10.3.1-packaged apps with
+         "Error loading application package: Invalid argument". A native entry point
+         loads the same Cascades binary fine and the C++-built UI renders correctly.
+         Revisit once building/testing on a version-matched (10.3.1) simulator. -->
+
+    <!-- x86 build for the BB10 simulator -->
+    <configuration name="Simulator-Debug">
+        <platformArchitecture>x86</platformArchitecture>
+        <asset path="HelloBridge" entry="true" type="Qnx/Elf">HelloBridge</asset>
+    </configuration>
+
+</qnx>

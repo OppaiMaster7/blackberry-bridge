@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<qnx xmlns="http://www.qnx.com/schemas/application/1.0">
+
+    <id>com.bridge.launcher</id>
+    <name>Bridge</name>
+    <versionNumber>0.1.0</versionNumber>
+    <buildId>1</buildId>
+    <description>BlackBerry Bridge launcher</description>
+    <author>BlackBerry Bridge</author>
+
+    <initialWindow>
+        <autoOrients>false</autoOrients>
+        <aspectRatio>portrait</aspectRatio>
+    </initialWindow>
+
+    <!-- needed for the TCP connectivity check (ConnectionManager) -->
+    <permission>access_internet</permission>
+    <!-- BB10 SUSPENDS apps that aren't visible (thumbnail/screen lock) — a suspended
+         client stops requesting frames and the mirror silently freezes. This keeps the
+         VNC session alive no matter what the window state is. -->
+    <permission>run_when_backgrounded</permission>
+
+    <!-- Native entry point: the 10.3.2 sim's Qt launcher rejects 10.3.1-packaged Qt
+         entry points ("Invalid argument"); native entry loads the Cascades binary fine
+         and asset:///main.qml still resolves. -->
+
+    <configuration name="Simulator-Debug">
+        <platformArchitecture>x86</platformArchitecture>
+        <asset path="BridgeLauncher" entry="true" type="Qnx/Elf">BridgeLauncher</asset>
+    </configuration>
+
+    <!-- bundle QML assets -->
+    <asset path="assets">assets</asset>
+
+</qnx>

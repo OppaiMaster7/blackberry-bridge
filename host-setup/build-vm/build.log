@@ -1,0 +1,28 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260702155209
+Username: 4F607C3A-CECF-4\WDAGUtilityAccount
+RunAs User: 4F607C3A-CECF-4\WDAGUtilityAccount
+Configuration Name: 
+Machine: 4F607C3A-CECF-4 (Microsoft Windows NT 10.0.26100.0)
+Host Application: powershell.exe -NoExit -ExecutionPolicy Bypass -File C:\build\build-bar.ps1
+Process ID: 5356
+PSVersion: 5.1.26100.8655
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.8655
+BuildVersion: 10.0.26100.8655
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+== cleaning previous build ==
+== [1/3] qmake ==
+PS>TerminatingError(): "Program 'qmake.exe' failed to run: An Application Control policy has blocked this fileAt C:\build\build-bar.ps1:30 char:1
++ & "$BIN/qmake.exe" -spec $SPEC BridgeLauncher.pro CONFIG+=debug
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~."
+BUILD FAILED: An Application Control policy has blocked this file
+**********************
+Windows PowerShell transcript end
+End time: 20260702155210
+**********************

@@ -1,0 +1,60 @@
+# Secrets — Tailscale auth keys and any credentials stay in env/config, never committed
+*.env
+.env
+.env.*
+*.key
+*secret*
+*credential*
+host-setup/**/*.local.*
+
+# Client binaries — large, redistribution-murky; source them per client-sourcing/README.md
+*.bar
+*.apk
+*.aab
+# EXCEPTIONS — these two are the product and cannot be recreated (BB compiler is dead,
+# see docs/SAFE-BUILD.md), so they ARE committed:
+!cascades-app/BridgeLauncher/BridgeLauncher.bar
+!host-setup/droidvnc-ng-2.20.0.apk
+
+# Large SDK / simulator installers fetched from archive.org (multi-GB, not for git)
+sdk-downloads/*.exe
+sdk-downloads/*.zip
+sdk-downloads/*.bin
+
+# BB10 / Momentics build output
+cascades-app/**/build/
+cascades-app/**/.metadata/
+cascades-app/**/arm/
+cascades-app/**/x86/
+cascades-app/**/Device-*/
+cascades-app/**/Simulator-*/
+*.o
+*.so
+moc_*.cpp
+# working copy of the app binary (regenerated from BridgeLauncher.recovered when packaging;
+# the .recovered file IS committed — it's the irreplaceable master)
+cascades-app/BridgeLauncher/BridgeLauncher
+cascades-app/HelloBridge/HelloBridge
+
+# portable JDK the setup wizard may download for itself
+host-setup/jdk/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# OS / editor cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+
+# Claude Code local settings (machine-specific)
+.claude/
+
+# per-machine mirror access code (regenerated on first run)
+host-setup/bridge_access_key.txt
+host-setup/bridge_public_url.txt
+# failsafe: generated URL + DuckDNS token (token is a SECRET, never commit)
+host-setup/bridge_failsafe_url.txt
+host-setup/duckdns.txt
