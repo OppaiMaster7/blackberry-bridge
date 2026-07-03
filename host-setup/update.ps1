@@ -1,20 +1,25 @@
 # update.ps1 — BlackBerry Bridge self-updater.
 #
-# Pulls the latest code straight from the PUBLIC GitHub repo and drops it over this
-# folder. No git, no login, no account needed — just internet. Works whether this
-# folder was git-cloned OR copied here on a USB stick.
+# Pulls the latest code straight from the PUBLIC GitHub repo and drops it over the
+# project folder. No git, no login, no account needed — just internet. Works whether
+# the folder was git-cloned OR copied here on a USB stick.
 #
 # Your machine-specific files are SAFE: the access code, DuckDNS token, and saved URLs
 # live in gitignored files that are NOT in the download, so they're never touched.
 #
-# Run it by double-clicking UPDATE.cmd (which calls this).
+# -Root <path>  the project folder to update. UPDATE.cmd passes this in. If omitted,
+#               it's derived from where this script sits (host-setup\ -> parent).
+
+param([string]$Root)
 
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# the folder this script lives in is host-setup\ ; the project root is its parent
-$HERE = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ROOT = Split-Path -Parent $HERE
+if (-not $Root) {
+  $HERE = Split-Path -Parent $MyInvocation.MyCommand.Path
+  $Root = Split-Path -Parent $HERE
+}
+$Root = $Root.TrimEnd('\')
 
 $REPO = "https://github.com/OppaiMaster7/blackberry-bridge"
 $ZIP  = "$REPO/archive/refs/heads/master.zip"
@@ -24,20 +29,29 @@ Write-Host "==================================================" -ForegroundColor
 Write-Host "   BlackBerry Bridge - UPDATE" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "[*] Updating folder: $ROOT"
+Write-Host "[*] Updating folder: $Root"
 Write-Host "[*] Downloading the latest version from GitHub..."
 
-$tmp   = Join-Path $env:TEMP ("bbbridge_update_" + [guid]::NewGuid().ToString("N"))
-$zip   = "$tmp.zip"
+$tmp = Join-Path $env:TEMP ("bbbridge_update_" + [guid]::NewGuid().ToString("N"))
+$zip = "$tmp.zip"
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
-try {
-  Invoke-WebRequest -Uri $ZIP -OutFile $zip -UseBasicParsing -TimeoutSec 120
-} catch {
+# Download the zip. curl.exe (built into Windows 10/11) is the most reliable for large
+# binaries; fall back to .NET WebClient. Invoke-WebRequest is avoided on purpose - it
+# corrupts/aborts big binary downloads on Windows PowerShell 5.1.
+$ok = $false
+$curl = (Get-Command curl.exe -ErrorAction SilentlyContinue)
+if ($curl) {
+  & curl.exe -sL --fail $ZIP -o $zip
+  if ((Test-Path $zip) -and (Get-Item $zip).Length -gt 100000) { $ok = $true }
+}
+if (-not $ok) {
+  try { (New-Object Net.WebClient).DownloadFile($ZIP, $zip)
+        if ((Test-Path $zip) -and (Get-Item $zip).Length -gt 100000) { $ok = $true } } catch {}
+}
+if (-not $ok) {
   Write-Host ""
-  Write-Host "[X] Download failed: $($_.Exception.Message)" -ForegroundColor Red
-  Write-Host "    Check the internet connection and try again." -ForegroundColor Red
-  Write-Host "    (If it says 404, the repo may still be private - it must be public.)" -ForegroundColor Red
+  Write-Host "[X] Download failed. Check the internet connection and try again." -ForegroundColor Red
   Write-Host ""
   Read-Host "Press Enter to close"
   exit 1
@@ -54,10 +68,12 @@ if (-not $src) {
   exit 1
 }
 
+if (-not (Test-Path $Root)) { New-Item -ItemType Directory -Path $Root -Force | Out-Null }
+
 Write-Host "[*] Installing the new files (your access code + settings are kept)..."
-# Copy everything from the download over this folder. This OVERWRITES code files but
-# never deletes your local-only files (they aren't in the download, so they survive).
-Copy-Item -Path (Join-Path $src.FullName "*") -Destination $ROOT -Recurse -Force
+# Copy everything from the download over the project folder. This OVERWRITES code files
+# but never deletes your local-only files (they aren't in the download, so they survive).
+Copy-Item -Path (Join-Path $src.FullName "*") -Destination $Root -Recurse -Force
 
 # cleanup
 Remove-Item $zip -Force -ErrorAction SilentlyContinue
