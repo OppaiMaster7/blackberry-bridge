@@ -24,10 +24,12 @@ import hmac
 import io
 import json
 import os
+import queue
 import re
 import secrets
 import socket
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -42,7 +44,8 @@ except ImportError:
 
 VNC_HOST, VNC_PORT = "127.0.0.1", 5901
 HTTP_PORT = 8080
-JPEG_QUALITY = 70
+JPEG_QUALITY = 62       # smaller frames = less to send AND faster to DECODE on the BB's
+                        # 2014 CPU (the mirror's decode cost is a real part of the felt lag)
 PULL_INTERVAL = 0.055   # pace of full-frame pulls (~18/s, the local link's ceiling)
 
 # Access code: without it, anyone on the same Wi-Fi could watch AND control the phone.
@@ -241,6 +244,80 @@ class VncFeed(threading.Thread):
 
 FEED = VncFeed()
 
+
+def _find_adb():
+    """Locate adb.exe so keystrokes can be injected. droidVNC-NG's own RFB keyboard path
+    does NOT type into fields (verified against 2.20.0), but `adb shell input` does."""
+    cands = [os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                          "Android", "Sdk", "platform-tools", "adb.exe"), "adb"]
+    for c in cands:
+        try:
+            subprocess.run([c, "version"], capture_output=True, timeout=6)
+            return c
+        except Exception:
+            continue
+    return None
+
+
+ADB = _find_adb()
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0   # keep adb from flashing a console
+
+
+class KeyInjector(threading.Thread):
+    """Types the BlackBerry's physical keystrokes into the focused Android field via
+    `adb shell input`. Printable characters are BATCHED into one `input text` call so a
+    whole word/email goes in at once; space and control keys go as `input keyevent`."""
+
+    # X11 keysym (what the page sends as ?c=) -> Android KEYCODE for non-text keys
+    KEYCODE = {0x20: 62,      # Space
+               0xff08: 67,    # BackSpace -> DEL
+               0xff0d: 66,    # Return -> ENTER
+               0xff09: 61,    # Tab
+               0xff1b: 111,   # Escape
+               0xffff: 112,   # Delete -> FORWARD_DEL
+               0xff51: 21, 0xff52: 19, 0xff53: 22, 0xff54: 20}  # Left/Up/Right/Down
+    _META = set('()<>|&;$`"\'\\*?~#!{}[]')   # device-shell metachars to backslash-escape
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.q = queue.Queue()
+
+    def push(self, keysym):
+        self.q.put(keysym)
+
+    def _adb(self, *args):
+        if not ADB:
+            return
+        try:
+            subprocess.run([ADB, "shell", *args], capture_output=True,
+                           timeout=6, creationflags=_NO_WINDOW)
+        except Exception:
+            pass
+
+    def _flush(self, buf):
+        if buf:
+            self._adb("input", "text", "".join(buf))
+            del buf[:]
+
+    def run(self):
+        buf = []
+        while True:
+            ks = self.q.get()
+            code = self.KEYCODE.get(ks)
+            if code is not None:                 # space / control key
+                self._flush(buf)
+                self._adb("input", "keyevent", str(code))
+            elif 33 <= ks <= 126:                # printable ASCII -> batch
+                ch = chr(ks)
+                buf.append("\\" + ch if ch in self._META else ch)
+                if len(buf) >= 24 or self.q.empty():   # flush on a pause or when long
+                    self._flush(buf)
+            else:
+                self._flush(buf)                 # anything else: just flush what we have
+
+
+KEYS = KeyInjector()
+
 PAGE = """<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -359,6 +436,33 @@ if ('ontouchstart' in window) {
   img.onmousemove = function (e) { if (mdown) return onMove(e); };
   img.onmouseup   = function (e) { mdown = false; return onUp(e); };
 }
+
+// --- physical keyboard: type on the BlackBerry's REAL keys, injected straight into
+//     the Android field (no Android on-screen keyboard eating the screen). keypress
+//     carries the actual character (handles Shift/symbols); keydown carries the
+//     control keys. Both fire on the old BB10 WebKit from the hardware keyboard. ---
+function sendKey(ks) {
+  var r = new XMLHttpRequest();
+  r.open('GET', '/key?k=' + KEY + '&c=' + ks, true);
+  r.send();
+}
+// keyCode -> X11 keysym for non-printable keys
+var SPECIAL = { 8:0xFF08, 9:0xFF09, 13:0xFF0D, 27:0xFF1B, 46:0xFFFF,
+                37:0xFF51, 38:0xFF52, 39:0xFF53, 40:0xFF54 };
+document.addEventListener('keydown', function (e) {
+  var k = e.keyCode || e.which;
+  if (SPECIAL[k]) {           // Backspace/Enter/Tab/Esc/Del/arrows
+    sendKey(SPECIAL[k]);
+    e.preventDefault();       // stop Backspace navigating back, Space scrolling, etc.
+  }
+}, false);
+document.addEventListener('keypress', function (e) {
+  var c = e.charCode || e.which;
+  if (c && c >= 32) {         // a real printable character: keysym == code point for Latin-1
+    sendKey(c);
+    e.preventDefault();
+  }
+}, false);
 </script>
 </body></html>"""
 
@@ -433,6 +537,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, "text/plain", b"ok")
             except ValueError:
                 self._send(400, "text/plain", b"bad")
+        elif path == "/key":
+            # physical BlackBerry keyboard -> adb `input` -> Android focused field
+            try:
+                KEYS.push(int((q.get("c") or ["0"])[0]))
+                self._send(200, "text/plain", b"ok")
+            except ValueError:
+                self._send(400, "text/plain", b"bad")
         elif path == "/status":
             w, h = FEED.size
             body = json.dumps({"connected": FEED.connected, "frame": FEED.frame_no,
@@ -444,6 +555,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     FEED.start()
+    KEYS.start()
+    print("[gateway] key injection via adb: %s" % (ADB or "NOT FOUND"), flush=True)
     srv = ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler)
     print("[gateway] serving on port %d, access key %s "
           "(BlackBerry opens http://<laptop-ip>:%d/?k=%s)"

@@ -40,6 +40,19 @@ function Wait-Boot {
   throw "emulator did not boot in time"
 }
 
+# 0b) Ensure the AVD advertises a hardware keyboard BEFORE boot: then Android won't pop its
+#     on-screen keyboard when a text field is focused, so the BlackBerry's PHYSICAL keys
+#     (injected via browser_gateway /key) are the only keyboard. Editing config.ini only
+#     takes effect on a cold start, which is why it's done here before launch.
+$cfg = Join-Path $env:USERPROFILE ".android\avd\$AVD.avd\config.ini"
+if (Test-Path $cfg) {
+  $lines = Get-Content $cfg
+  if ($lines -match '^hw\.keyboard\s*=\s*no') {
+    ($lines -replace '^hw\.keyboard\s*=\s*no', 'hw.keyboard = yes') | Set-Content $cfg
+    Write-Host "[*] set hw.keyboard = yes in the AVD (keeps the soft keyboard hidden)"
+  }
+}
+
 # 1) emulator (detached) if not already running. Audio ON (Instagram/WhatsApp sound plays
 #    through the laptop speakers); only the NOTIFICATION stream is muted below, so
 #    droidVNC's client-connect "ding" stays silent.
@@ -80,6 +93,11 @@ Write-Host "[*] setting Android to 720x720 square + 3-button nav..."
 & $ADB shell wm size 720x720 2>$null
 & $ADB shell wm density 280 2>$null
 & $ADB shell cmd overlay enable com.android.internal.systemui.navbar.threebutton 2>$null
+# Physical-keyboard typing: the BlackBerry's real keys are injected as key events
+# (browser_gateway /key), so keep Android's ON-SCREEN keyboard hidden - it would cover the
+# mirror. hw.keyboard=yes in the AVD makes Android believe a hardware keyboard is attached;
+# this setting stops it showing the soft keyboard anyway when a field is focused.
+& $ADB shell settings put secure show_ime_with_hard_keyboard 0 2>$null
 Start-Sleep -Seconds 2
 
 # 4) forward guest 5900 -> host 127.0.0.1:5901
